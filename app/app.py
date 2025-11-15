@@ -10,7 +10,7 @@ from watchdog.events import FileSystemEventHandler
 
 sys.path.append(os.path.abspath('./src'))
 from preprocessing import load_train_data, run_preproc
-from scorer import make_pred, get_top_features, plot_ditribution
+from scorer import make_pred, get_top_features, make_submission, plot_ditribution
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,8 +40,7 @@ class ProcessingService:
             processed_df = run_preproc(self.train, input_df)
             
             logger.info('Making prediction')
-            submission = make_pred(processed_df, file_path)
-
+            predictions = make_pred(processed_df, file_path)
 
             top_k = 5
             logger.info(f'Getting top {top_k} features')
@@ -50,17 +49,18 @@ class ProcessingService:
             with open(os.path.join(self.output_dir, top_features_file_name), "w+") as f:
                 json.dump(features, f)
             
-            logger.info('Prepraring submission file')
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             data_file_name = os.path.basename(file_path)
-            output_filename = f"predictions_{timestamp}_{data_file_name}"
-            submission.to_csv(os.path.join(self.output_dir, output_filename), index=False)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
             logger.info('Plotting predictions distribution')
             graph_filename = f"distribution_{timestamp}_{os.path.splitext(data_file_name)[0]}.png"
-            plot_ditribution(submission, os.path.join(self.output_dir, graph_filename))
+            plot_ditribution(predictions, os.path.join(self.output_dir, graph_filename))
 
-            logger.info('Predictions saved to: %s', output_filename)
+            logger.info('Prepraring submission file')
+            submission = make_submission(predictions)
+            submission_filename = f"predictions_{timestamp}_{data_file_name}"
+            submission.to_csv(os.path.join(self.output_dir, submission_filename), index=False)
+            logger.info('Submission saved to: %s', submission_filename)
 
         except Exception as e:
             logger.error('Error processing file %s: %s', file_path, e, exc_info=True)

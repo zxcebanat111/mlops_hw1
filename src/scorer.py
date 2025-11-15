@@ -1,6 +1,7 @@
 from catboost import CatBoostClassifier
 import logging
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 # Настройка логгера
@@ -16,17 +17,25 @@ model.load_model('./models/my_catboost.cbm')
 model_th = 0.98
 logger.info('Pretrained model imported successfully...')
 
-# Make prediction
+
+# Make predictions
 def make_pred(dt, path_to_file):
 
     # Make submission dataframe
-    submission = pd.DataFrame({
+    predictions = pd.DataFrame({
         'index':  pd.read_csv(path_to_file).index,
-        'prediction': (model.predict_proba(dt)[:, 1] > model_th) * 1
+        'prediction': model.predict_proba(dt)[:, 1],
     })
     logger.info('Prediction complete for file: %s', path_to_file)
 
     # Return proba for positive class
+    return predictions
+
+
+# Make submission
+def make_submission(predictions):
+    submission = predictions.copy()
+    submission['prediction'] = (submission['prediction'] > model_th) * 1
     return submission
 
 
@@ -40,19 +49,18 @@ def get_top_features(top_k=5):
     return top_features
 
 
-# Plot predicted labels distribution
+# Plot predicted probas distribution
 def plot_ditribution(predictions, save_path):
-    stats = predictions.groupby('prediction')['index'].count()
+    plt.figure(figsize=(10, 6))
+    plt.hist(predictions['prediction'], bins=50, color='skyblue', edgecolor='black', alpha=0.7)
 
-    plt.figure(figsize=(8, 6))
-    plt.bar(x=stats.index.values, height=stats.values, color=['skyblue', 'lightcoral'])
-
-    plt.xlabel('Target Value')
-    plt.ylabel('Count')
-    plt.title('Distribution of Target Variable')
-    plt.xticks(stats.index.values, ['Not Fraud (0)', 'Fraud (1)'])
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.title('Distribution of Model Prediction Scores', fontsize=16)
+    plt.xlabel('Prediction Score', fontsize=12)
+    plt.ylabel('Frequency', fontsize=12)
+    plt.grid(axis='y', alpha=0.75)
+    plt.xticks(np.arange(0, 1.1, 0.1))
+    plt.xlim(0, 1)
     plt.tight_layout()
 
     plt.savefig(save_path)
-    logger.info(f'Graph saved to {save_path}')
+    logger.info(f'Distribution graph saved to {save_path}')
